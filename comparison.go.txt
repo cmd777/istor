@@ -1,0 +1,155 @@
+package main
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/cmd777/istor"
+)
+
+func main() {
+	BulkSmall()
+	BulkBig()
+	DnselSmall()
+	DnselBig()
+	OnionooSmall()
+}
+
+func BulkSmall() {
+	ntime := time.Now()
+
+	IPs := GetIPList("testiplist.txt")
+	Bulklist := GetBulk()
+
+	Detected := CheckBulk(IPs, Bulklist)
+
+	fmt.Printf("SmallBulk Detection Ratio: \t%0.2f%% \t| %v no. of IPs were detected out of %v (took %v)\r\n", ((Detected / float64(len(IPs))) * 100), Detected, len(IPs), time.Since(ntime))
+}
+
+func BulkBig() {
+	ntime := time.Now()
+
+	IPs := GetIPList("onionooresults.txt")
+	Bulklist := GetBulk()
+
+	Detected := CheckBulk(IPs, Bulklist)
+
+	fmt.Printf("BigBulk Detection Ratio: \t%0.2f%% \t| %v no. of IPs were detected out of %v (took %v)\r\n", ((Detected / float64(len(IPs))) * 100), Detected, len(IPs), time.Since(ntime))
+}
+
+func DnselSmall() {
+	ntime := time.Now()
+
+	IPs := GetIPList("testiplist.txt")
+
+	Detected := CheckDNSEL(IPs)
+
+	fmt.Printf("DnselSmall Detection Ratio: \t%0.2f%% \t| %v no. of IPs were detected out of %v (took %v)\r\n", ((Detected / float64(len(IPs))) * 100), Detected, len(IPs), time.Since(ntime))
+}
+
+func DnselBig() {
+	ntime := time.Now()
+
+	IPs := GetIPList("onionooresults.txt")
+
+	Detected := CheckDNSEL(IPs)
+
+	fmt.Printf("DnselBig Detection Ratio: \t%0.2f%% \t| %v no. of IPs were detected out of %v (took %v)\r\n", ((Detected / float64(len(IPs))) * 100), Detected, len(IPs), time.Since(ntime))
+}
+
+func OnionooSmall() {
+	ntime := time.Now()
+
+	IPs := GetIPList("testiplist.txt")
+
+	Detected := CheckOnionoo(IPs)
+
+	fmt.Printf("OnionooSmall Detection Ratio: \t%0.2f%% | %v no. of IPs were detected out of %v (took %v)\r\n", ((Detected / float64(len(IPs))) * 100), Detected, len(IPs), time.Since(ntime))
+
+}
+
+func GetIPList(from string) []string {
+	read, err := os.Open(from)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	scanner := bufio.NewScanner(read)
+	scanner.Split(bufio.ScanLines)
+	var lines []string
+
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	defer read.Close()
+
+	return lines
+}
+
+func GetBulk() []string {
+	resp, err := http.Get("https://check.torproject.org/torbulkexitlist")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Split(bufio.ScanLines)
+	var lines []string
+
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	defer resp.Body.Close()
+
+	return lines
+}
+
+func CheckBulk(IPs, Bulklist []string) (Detected float64) {
+	for _, k := range IPs {
+		for _, v := range Bulklist {
+			if k == v {
+				Detected++
+			}
+		}
+	}
+
+	return Detected
+}
+
+func CheckDNSEL(IPs []string) (Detected float64) {
+	for _, ip := range IPs {
+		partsstr := strings.Split(ip, ".")
+
+		for i, j := 0, len(partsstr)-1; i < j; i, j = i+1, j-1 {
+			partsstr[i], partsstr[j] = partsstr[j], partsstr[i]
+		}
+
+		ipaddr, _ := net.DefaultResolver.LookupIPAddr(context.Background(), fmt.Sprintf("%v.dnsel.torproject.org", strings.Join(partsstr, ".")))
+
+		for _, ip := range ipaddr {
+			if ip.IP.Equal(net.IPv4(127, 0, 0, 2)) {
+				Detected++
+			}
+		}
+	}
+	return Detected
+}
+
+func CheckOnionoo(IPs []string) (Detected float64) {
+	for _, ip := range IPs {
+		_, code, _ := istor.IsRelay(ip, "")
+		if code == istor.IP_TOR_RELAY {
+			Detected++
+		}
+	}
+	return Detected
+}
