@@ -28,6 +28,7 @@ However, the Onionoo service is much more accurate than TorDNSEL or the Bulk Exi
 | DnselSmall	| Detection Ratio:		70.45%		| 31 no. of IPs were detected out of 44 (took 4.4009804s)				|
 | DnselBig		| Detection Ratio:		18.69%		| 1111 no. of IPs were detected out of 5945 (took 13m10.1466185s)		|
 | OnionooSmall	| Detection Ratio:		100.00%		| 44 no. of IPs were detected out of 44 (took 2.7418165s)				|
+
 _check comparison.go.txt for the code that was used._
 
 **Does this mean that it's always a 100% detection rate?**
